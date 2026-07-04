@@ -56,7 +56,7 @@ Constants
 
 Version:
 
-0.5.0
+0.5.1
 
 Database Version:
 
@@ -124,6 +124,7 @@ Completed Features
 - Search orders (filters by order number, remarks, product name, brand)
 - Detailed invoice style modal view
 - Exclude cancelled orders from dashboard metrics and analytics reports
+- **Undo Last Order**: Allows showroom staff to undo the absolute latest completed order in case of billing mistakes. Restores product inventory levels and transitions the order status to `CANCELLED` transactionally.
 
 ---
 
@@ -314,6 +315,8 @@ feat(reports): implement reporting module
 feat(settings): implement settings module
 
 feat(orders): transform transactions into order management system
+
+feat(orders): implement undo last order feature
 
 ---
 

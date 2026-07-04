@@ -123,19 +123,19 @@ class _EntryScreenState extends State<EntryScreen> {
     }
   }
 
-  Future<void> _cancelOrder(Order order) async {
+  Future<void> _handleUndoOrder(Order order) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Cancel Order?"),
-        content: Text(
-          "Are you sure you want to cancel order '${order.orderNumber}'? This will restore the stock of all associated products and mark this order as CANCELLED. This action is irreversible.",
+        title: const Text("Undo Order?"),
+        content: const Text(
+          "This will restore stock for every item in this order.\nThis action cannot be reversed.",
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("No, Keep"),
+            child: const Text("Cancel"),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -146,7 +146,7 @@ class _EntryScreenState extends State<EntryScreen> {
               ),
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Yes, Cancel Order"),
+            child: const Text("Undo"),
           ),
         ],
       ),
@@ -154,23 +154,23 @@ class _EntryScreenState extends State<EntryScreen> {
 
     if (confirmed == true) {
       try {
-        await _orderService.cancelOrder(order.id!);
+        await _orderService.undoOrder(order.id!);
         if (!mounted) return;
         
         Navigator.pop(context); // Close bottom details sheet
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Order cancelled successfully, stock restored."),
+            content: Text("Order undone successfully, stock restored."),
             backgroundColor: AppColors.success,
           ),
         );
         _loadOrders();
       } catch (e) {
-        debugPrint("Error cancelling order: $e");
+        debugPrint("Error undoing order: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Failed to cancel order: $e"),
+              content: Text("Failed to undo order: ${e.toString().replaceAll("Exception: ", "")}"),
               backgroundColor: AppColors.error,
             ),
           );
@@ -179,7 +179,11 @@ class _EntryScreenState extends State<EntryScreen> {
     }
   }
 
-  void _showOrderDetails(Order order) {
+  void _showOrderDetails(Order order) async {
+    // Dynamically check if this order is the latest completed order in the database
+    final isLatest = await _orderService.isLatestCompletedOrder(order.id!);
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -353,13 +357,12 @@ class _EntryScreenState extends State<EntryScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Actions panel
-                  if (!isCancelled) ...[
+                  // Actions panel (Only show Undo Order for the latest completed order)
+                  if (isLatest) ...[
                     PrimaryButton(
-                      text: "Cancel Showroom Order",
-                      onPressed: () => _cancelOrder(order),
-                      icon: Icons.cancel_outlined,
-                      // Style button red to show cancellation warning
+                      text: "Undo Order",
+                      onPressed: () => _handleUndoOrder(order),
+                      icon: Icons.undo_outlined,
                     ),
                     const SizedBox(height: 12),
                   ],

@@ -96,7 +96,101 @@ class OrderService {
     }
   }
 
-  // Cancels an order, setting status to CANCELLED and restoring stock levels
+  // Checks if the given order is the latest completed order in the database
+  Future<bool> isLatestCompletedOrder(int orderId) async {
+    try {
+      final Database db = await _databaseHelper.database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'orders',
+        orderBy: 'id DESC',
+        limit: 1,
+      );
+      if (maps.isEmpty) return false;
+      final latestOrder = maps.first;
+      return latestOrder['id'] == orderId && latestOrder['status'] == 'COMPLETED';
+    } catch (e) {
+      debugPrint("Error checking if latest completed order: $e");
+      return false;
+    }
+  }
+
+  // Undoes the last order, restoring inventory stock levels and setting status to CANCELLED
+  Future<void> undoOrder(int orderId) async {
+    try {
+      final Database db = await _databaseHelper.database;
+
+      await db.transaction((txn) async {
+        // 1. Fetch the latest order in the DB
+        final List<Map<String, dynamic>> latestMaps = await txn.query(
+          'orders',
+          orderBy: 'id DESC',
+          limit: 1,
+        );
+
+        if (latestMaps.isEmpty) {
+          throw Exception("No orders exist in the database.");
+        }
+
+        final latestOrder = latestMaps.first;
+        if (latestOrder['id'] != orderId) {
+          throw Exception("Only the most recent order can be undone.");
+        }
+
+        final status = latestOrder['status'] as String;
+        if (status == 'CANCELLED') {
+          throw Exception("Order is already cancelled/undone.");
+        }
+        if (status != 'COMPLETED') {
+          throw Exception("Only completed orders can be undone.");
+        }
+
+        // 2. Fetch order items
+        final List<Map<String, dynamic>> itemMaps = await txn.query(
+          'order_items',
+          where: 'order_id = ?',
+          whereArgs: [orderId],
+        );
+
+        // 3. Restore stock
+        for (final itemMap in itemMaps) {
+          final productId = itemMap['product_id'] as int;
+          final quantity = itemMap['quantity'] as int;
+
+          // Fetch product
+          final List<Map<String, dynamic>> productMaps = await txn.query(
+            'products',
+            where: 'id = ?',
+            whereArgs: [productId],
+          );
+
+          if (productMaps.isNotEmpty) {
+            final product = Product.fromMap(productMaps.first);
+            final restoredStock = product.boxesInStock + quantity;
+            
+            await txn.update(
+              'products',
+              {'boxes_in_stock': restoredStock},
+              where: 'id = ?',
+              whereArgs: [productId],
+            );
+          }
+        }
+
+        // 4. Update order status
+        await txn.update(
+          'orders',
+          {'status': 'CANCELLED'},
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+      });
+    } catch (e) {
+      debugPrint("Error in undoOrder transaction: $e");
+      rethrow;
+    }
+  }
+
+  // Cancels an order, setting status to CANCELLED and restoring stock levels (legacy method)
   Future<void> cancelOrder(int orderId) async {
     try {
       final Database db = await _databaseHelper.database;
