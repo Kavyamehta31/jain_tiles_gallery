@@ -147,7 +147,7 @@ class ProductService {
     }
   }
 
-  // Updates product details, processes image diffs (adds new, deletes removed on disk & db)
+  // Updates product details, processes image diffs
   Future<int> updateProduct(Product product) async {
     final productId = product.id;
     if (productId == null) return 0;
@@ -175,12 +175,12 @@ class ProductService {
             .map((row) => row['image_path'] as String)
             .toList();
 
-        // Deleted images: in DB but not in the product's updated image list
+        // Deleted images
         final List<String> deletedPaths = dbPaths
             .where((path) => !product.imagePaths.contains(path))
             .toList();
 
-        // New images: in product's updated image list but not in DB
+        // New images
         final List<String> newPaths = product.imagePaths
             .where((path) => !dbPaths.contains(path))
             .toList();
@@ -241,13 +241,7 @@ class ProductService {
           whereArgs: [id],
         );
 
-        await txn.delete(
-          'transactions',
-          where: 'product_id = ?',
-          whereArgs: [id],
-        );
-
-        // Delete the parent product
+        // Delete the parent product (cascade delete will automatically clean up order_items)
         return await txn.delete(
           'products',
           where: 'id = ?',

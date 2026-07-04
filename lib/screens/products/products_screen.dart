@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../services/settings_service.dart';
 import '../../widgets/product_card.dart';
 import 'add_product_screen.dart';
 
@@ -17,11 +18,13 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   final ProductService _productService = ProductService();
+  final SettingsService _settingsService = SettingsService();
 
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
+  int _lowStockLimit = 5;
 
   @override
   void initState() {
@@ -41,8 +44,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     });
 
     try {
+      final settings = await _settingsService.getSettings();
       final products = await _productService.getProducts();
       setState(() {
+        _lowStockLimit = settings.lowStockLimit;
         _products = products;
         _searchProducts(_searchController.text);
       });
@@ -113,7 +118,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ),
           title: const Text("Delete Product?"),
           content: Text(
-            "Are you sure you want to delete '${product.name}'? This will delete all its images and transactional stock entries permanently.",
+            "Are you sure you want to delete '${product.name}'? This will delete all its images and order items permanently.",
           ),
           actions: [
             TextButton(
@@ -251,6 +256,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   _buildDetailRow("Variety", product.variety),
                   _buildDetailRow("Boxes in Stock", "${product.boxesInStock} Boxes"),
                   _buildDetailRow("Pieces per Box", "${product.piecesPerBox} Pcs"),
+                  _buildDetailRow("Selling Price", "₹${product.sellingPricePerBox.toStringAsFixed(2)} / Box"),
                   const Divider(height: 24),
 
                   // Description
@@ -431,6 +437,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               onTap: () => _showProductDetails(product),
                               onEdit: () => _openEditProduct(product),
                               onDelete: () => _confirmDelete(product),
+                              lowStockLimit: _lowStockLimit,
                             );
                           },
                         ),

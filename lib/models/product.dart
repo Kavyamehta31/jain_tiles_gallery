@@ -6,6 +6,7 @@ class Product {
   final String variety;
   final int boxesInStock;
   final int piecesPerBox;
+  final double sellingPricePerBox;
   final String description;
   final List<String> imagePaths;
 
@@ -17,6 +18,7 @@ class Product {
     required this.variety,
     required this.boxesInStock,
     required this.piecesPerBox,
+    this.sellingPricePerBox = 0.0,
     required this.description,
     this.imagePaths = const [],
   });
@@ -29,6 +31,7 @@ class Product {
     String? variety,
     int? boxesInStock,
     int? piecesPerBox,
+    double? sellingPricePerBox,
     String? description,
     List<String>? imagePaths,
   }) {
@@ -40,6 +43,7 @@ class Product {
       variety: variety ?? this.variety,
       boxesInStock: boxesInStock ?? this.boxesInStock,
       piecesPerBox: piecesPerBox ?? this.piecesPerBox,
+      sellingPricePerBox: sellingPricePerBox ?? this.sellingPricePerBox,
       description: description ?? this.description,
       imagePaths: imagePaths ?? this.imagePaths,
     );
@@ -54,6 +58,7 @@ class Product {
       'variety': variety,
       'boxes_in_stock': boxesInStock,
       'pieces_per_box': piecesPerBox,
+      'selling_price_per_box': sellingPricePerBox,
       'description': description,
     };
   }
@@ -67,6 +72,7 @@ class Product {
       variety: map['variety'] as String,
       boxesInStock: map['boxes_in_stock'] as int,
       piecesPerBox: map['pieces_per_box'] as int,
+      sellingPricePerBox: (map['selling_price_per_box'] as num?)?.toDouble() ?? 0.0,
       description: (map['description'] ?? '') as String,
       imagePaths: imagePaths,
     );

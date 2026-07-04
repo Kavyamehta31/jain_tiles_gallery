@@ -31,6 +31,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController otherBrandController = TextEditingController();
   final TextEditingController quantityController = TextEditingController();
   final TextEditingController piecesController = TextEditingController();
+  final TextEditingController priceController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
   String? selectedBrand;
@@ -59,6 +60,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       selectedVariety = p.variety;
       quantityController.text = p.boxesInStock.toString();
       piecesController.text = p.piecesPerBox.toString();
+      priceController.text = p.sellingPricePerBox.toString();
       descriptionController.text = p.description;
 
       _selectedImages = p.imagePaths.map((path) => File(path)).toList();
@@ -71,6 +73,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     otherBrandController.dispose();
     quantityController.dispose();
     piecesController.dispose();
+    priceController.dispose();
     descriptionController.dispose();
     super.dispose();
   }
@@ -121,6 +124,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         variety: selectedVariety!,
         boxesInStock: int.parse(quantityController.text),
         piecesPerBox: int.parse(piecesController.text),
+        sellingPricePerBox: double.parse(priceController.text),
         description: descriptionController.text.trim(),
         imagePaths: _selectedImages.map((f) => f.path).toList(),
       );
@@ -166,16 +170,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final availableVarieties = selectedSize != null
-        ? AppConstants.getVarieties(selectedSize)
-        : <String>[];
+    // Determine dynamic variety list based on selected size
+    final List<String> availableVarieties = AppConstants.getVarieties(selectedSize);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditMode ? "Edit Product" : "Add Product"),
+        title: Text(isEditMode ? "Edit Tile Product" : "Add Tile Product"),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
@@ -187,19 +190,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 onPickImages: _pickImages,
                 onRemoveImage: _removeImage,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-              const SectionTitle(title: "Tile Specification"),
+              const SectionTitle(title: "General Information"),
               CustomTextField(
                 controller: nameController,
-                label: "Product Name",
-                hint: "e.g., Carrara Gold Glossy",
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return "Product name is required";
-                  }
-                  return null;
-                },
+                label: "Tile Name",
+                hint: "e.g., Onyx Gold Polished",
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? "Name is required" : null,
               ),
 
               CustomDropdown<String>(
@@ -254,7 +253,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 validator: (val) => val == null ? "Variety is required" : null,
               ),
 
-              const SectionTitle(title: "Inventory & Quantities"),
+              const SectionTitle(title: "Inventory & Pricing"),
               Row(
                 children: [
                   Expanded(
@@ -293,6 +292,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: priceController,
+                label: "Selling Price per Box (₹)",
+                hint: "0.00",
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return "Price is required";
+                  }
+                  final parsed = double.tryParse(val);
+                  if (parsed == null || parsed <= 0) {
+                    return "Must be greater than 0";
+                  }
+                  return null;
+                },
               ),
 
               const SectionTitle(title: "Additional Info"),
