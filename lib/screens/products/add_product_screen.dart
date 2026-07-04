@@ -1,10 +1,22 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../widgets/custom_dropdown.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/image_picker_card.dart';
+import '../../widgets/primary_button.dart';
+import '../../widgets/section_title.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  final Product? product;
+
+  const AddProductScreen({super.key, this.product});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -12,155 +24,290 @@ class AddProductScreen extends StatefulWidget {
 
 class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final ProductService _productService = ProductService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   final TextEditingController nameController = TextEditingController();
-  String? selectedBrand;
-  String? selectedSize;
-
   final TextEditingController otherBrandController = TextEditingController();
-  final TextEditingController otherSizeController = TextEditingController();
   final TextEditingController quantityController = TextEditingController();
   final TextEditingController piecesController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
+  String? selectedBrand;
+  String? selectedSize;
+  String? selectedVariety;
+  List<File> _selectedImages = [];
+  bool _isLoading = false;
+
+  bool get isEditMode => widget.product != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isEditMode) {
+      final p = widget.product!;
+      nameController.text = p.name;
+
+      if (AppConstants.brands.contains(p.brand)) {
+        selectedBrand = p.brand;
+      } else {
+        selectedBrand = 'Other';
+        otherBrandController.text = p.brand;
+      }
+
+      selectedSize = p.size;
+      selectedVariety = p.variety;
+      quantityController.text = p.boxesInStock.toString();
+      piecesController.text = p.piecesPerBox.toString();
+      descriptionController.text = p.description;
+
+      _selectedImages = p.imagePaths.map((path) => File(path)).toList();
+    }
+  }
+
   @override
   void dispose() {
     nameController.dispose();
-    brandController.dispose();
-    sizeController.dispose();
+    otherBrandController.dispose();
     quantityController.dispose();
     piecesController.dispose();
     descriptionController.dispose();
     super.dispose();
   }
 
+  Future<void> _pickImages() async {
+    try {
+      final List<XFile> pickedFiles = await _imagePicker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          _selectedImages.addAll(pickedFiles.map((xFile) => File(xFile.path)));
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking images: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to pick images: $e")),
+        );
+      }
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+  }
+
   Future<void> _saveProduct() async {
-    if (nameController.text.trim().isEmpty ||
-        brandController.text.trim().isEmpty ||
-        sizeController.text.trim().isEmpty ||
-        quantityController.text.trim().isEmpty ||
-        piecesController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all required fields")),
-      );
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final product = Product(
-      name: nameController.text.trim(),
-      brand: brandController.text.trim(),
-      size: sizeController.text.trim(),
-      quantity: int.parse(quantityController.text),
-      piecesPerBox: int.parse(piecesController.text),
-      description: descriptionController.text.trim(),
-    );
+    setState(() {
+      _isLoading = true;
+    });
 
-    await _productService.addProduct(product);
+    try {
+      final finalBrand = selectedBrand == 'Other'
+          ? otherBrandController.text.trim()
+          : selectedBrand!;
 
-    if (!mounted) return;
+      final Product productData = Product(
+        id: widget.product?.id,
+        name: nameController.text.trim(),
+        brand: finalBrand,
+        size: selectedSize!,
+        variety: selectedVariety!,
+        boxesInStock: int.parse(quantityController.text),
+        piecesPerBox: int.parse(piecesController.text),
+        description: descriptionController.text.trim(),
+        imagePaths: _selectedImages.map((f) => f.path).toList(),
+      );
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Product added successfully")));
+      if (isEditMode) {
+        await _productService.updateProduct(productData);
+      } else {
+        await _productService.addProduct(productData);
+      }
 
-    Navigator.pop(context, true);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEditMode
+                ? "Product updated successfully"
+                : "Product added successfully",
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      Navigator.pop(context, true);
+    } catch (e) {
+      debugPrint("Error saving product: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to save product: $e"),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final availableVarieties = selectedSize != null
+        ? AppConstants.getVarieties(selectedSize)
+        : <String>[];
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Add Product")),
+      appBar: AppBar(
+        title: Text(isEditMode ? "Edit Product" : "Add Product"),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Image picker will be added next.
+              const SectionTitle(title: "Product Images"),
+              ImagePickerCard(
+                images: _selectedImages,
+                onPickImages: _pickImages,
+                onRemoveImage: _removeImage,
+              ),
+              const SizedBox(height: 24),
+
+              const SectionTitle(title: "Tile Specification"),
+              CustomTextField(
+                controller: nameController,
+                label: "Product Name",
+                hint: "e.g., Carrara Gold Glossy",
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return "Product name is required";
+                  }
+                  return null;
                 },
-                icon: const Icon(Icons.photo_library),
-                label: const Text("Add Images"),
+              ),
+
+              CustomDropdown<String>(
+                label: "Brand",
+                value: selectedBrand,
+                items: AppConstants.brands,
+                onChanged: (val) {
+                  setState(() {
+                    selectedBrand = val;
+                  });
+                },
+                validator: (val) => val == null ? "Brand is required" : null,
+              ),
+
+              if (selectedBrand == 'Other')
+                CustomTextField(
+                  controller: otherBrandController,
+                  label: "Custom Brand Name",
+                  hint: "Enter custom brand",
+                  validator: (val) {
+                    if (selectedBrand == 'Other' &&
+                        (val == null || val.trim().isEmpty)) {
+                      return "Custom brand name is required";
+                    }
+                    return null;
+                  },
+                ),
+
+              CustomDropdown<String>(
+                label: "Size",
+                value: selectedSize,
+                items: AppConstants.sizes,
+                onChanged: (val) {
+                  setState(() {
+                    selectedSize = val;
+                    // Reset variety if it's not valid for the new size
+                    selectedVariety = null;
+                  });
+                },
+                validator: (val) => val == null ? "Size is required" : null,
+              ),
+
+              CustomDropdown<String>(
+                label: "Variety",
+                value: selectedVariety,
+                items: availableVarieties,
+                onChanged: (val) {
+                  setState(() {
+                    selectedVariety = val;
+                  });
+                },
+                validator: (val) => val == null ? "Variety is required" : null,
+              ),
+
+              const SectionTitle(title: "Inventory & Quantities"),
+              Row(
+                children: [
+                  Expanded(
+                    child: CustomTextField(
+                      controller: quantityController,
+                      label: "Boxes in Stock",
+                      hint: "0",
+                      keyboardType: TextInputType.number,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return "Required";
+                        }
+                        if (int.tryParse(val) == null || int.parse(val) < 0) {
+                          return "Invalid count";
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: CustomTextField(
+                      controller: piecesController,
+                      label: "Pieces per Box",
+                      hint: "4",
+                      keyboardType: TextInputType.number,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return "Required";
+                        }
+                        if (int.tryParse(val) == null || int.parse(val) <= 0) {
+                          return "Invalid pieces";
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SectionTitle(title: "Additional Info"),
+              CustomTextField(
+                controller: descriptionController,
+                label: "Description (Optional)",
+                hint: "Enter color notes, design patterns, etc.",
+                maxLines: 3,
               ),
 
               const SizedBox(height: 24),
-
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: "Product Name",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: brandController,
-                decoration: const InputDecoration(
-                  labelText: "Brand",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: sizeController,
-                decoration: const InputDecoration(
-                  labelText: "Size",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Boxes in Stock",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: piecesController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Pieces per Box",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller: descriptionController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: "Description (Optional)",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: _saveProduct,
-                  child: const Text(
-                    "Save Product",
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
+              PrimaryButton(
+                text: isEditMode ? "Update Product" : "Save Product",
+                isLoading: _isLoading,
+                onPressed: _saveProduct,
               ),
             ],
           ),

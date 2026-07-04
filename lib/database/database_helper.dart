@@ -9,9 +9,7 @@ class DatabaseHelper {
   static Database? _database;
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-
-    _database = await _initDatabase();
+    _database ??= await _initDatabase();
     return _database!;
   }
 
@@ -21,7 +19,10 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: _createDatabase,
       onUpgrade: (db, oldVersion, newVersion) async {
         await db.execute('DROP TABLE IF EXISTS product_images');
@@ -41,9 +42,9 @@ class DatabaseHelper {
         brand TEXT NOT NULL,
         size TEXT NOT NULL,
         variety TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
+        boxes_in_stock INTEGER NOT NULL,
         pieces_per_box INTEGER NOT NULL,
-        description TEXT
+        description TEXT NOT NULL DEFAULT ''
       )
     ''');
 
@@ -52,19 +53,24 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
         image_path TEXT NOT NULL,
-        FOREIGN KEY(product_id) REFERENCES products(id)
+        FOREIGN KEY(product_id)
+        REFERENCES products(id)
+        ON DELETE CASCADE
       )
     ''');
 
     await db.execute('''
       CREATE TABLE transactions(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id TEXT NOT NULL,
         product_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        type TEXT NOT NULL,
+        transaction_date TEXT NOT NULL,
+        transaction_type TEXT NOT NULL,
         quantity INTEGER NOT NULL,
-        remarks TEXT,
-        FOREIGN KEY(product_id) REFERENCES products(id)
+        remarks TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY(product_id)
+        REFERENCES products(id)
+        ON DELETE CASCADE
       )
     ''');
   }

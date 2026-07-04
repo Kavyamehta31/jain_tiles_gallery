@@ -3,20 +3,30 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFFC8873A);
-  static const Color primaryDark = Color(0xFFAA6D29);
+  // Primary Brand Colors
+  static const Color primary = Color(0xFFB08D57);
+  static const Color primaryDark = Color(0xFF8C6A3A);
 
-  static const Color background = Colors.white;
+  // Background
+  static const Color background = Color(0xFFF8F9FA);
+  static const Color surface = Colors.white;
 
-  static const Color card = Color(0xFFF8F8F8);
+  // Text
+  static const Color textPrimary = Color(0xFF212121);
+  static const Color textSecondary = Color(0xFF616161);
 
-  static const Color text = Color(0xFF222222);
+  // Borders
+  static const Color border = Color(0xFFE0E0E0);
 
-  static const Color subtitle = Color(0xFF777777);
+  // Status
+  static const Color success = Color(0xFF2E7D32);
+  static const Color warning = Color(0xFFF9A825);
+  static const Color error = Color(0xFFC62828);
 
-  static const Color success = Color(0xFF4CAF50);
+  // Stock Colors
+  static const Color lowStock = Color(0xFFD32F2F);
+  static const Color inStock = Color(0xFF388E3C);
 
-  static const Color warning = Color(0xFFFF9800);
-
-  static const Color error = Color(0xFFE53935);
+  // Cards
+  static const Color card = Colors.white;
 }
